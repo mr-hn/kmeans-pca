@@ -24,6 +24,7 @@ library(cluster) # Cluster Analysis
 library(factoextra) # Visualizing Clusters
 library(plotly) # Interactive Plots
 library(gridExtra) # Plot graphs in grids
+library(shiny) # Center Plotly charts
 library(DT) # Print HTML Tables
 library(knitr) # Generating HTML document
 library(rmdformats) # Document theme
@@ -56,12 +57,12 @@ columns called principal components.
 
 <br>
 <div class = "grey"><font size = +1> <i>
-K-Means and PCA are thought of as two different procedures, having two different
-purposes and at first sight do not seem related. But that isn't true!
+K-Means and PCA are thought of as two different procedures having two different
+purposes, and at first sight they do not seem related. But that isn't true!
 </i> </font></div>
 <br>
-While principal components can help <i>rank</i> the records of the dataset, k-means
-just groups the records into, for example, <i>good/bad</i>. Principal components 
+While principal components can help, for example, <i>rank</i> the records of the 
+dataset, k-means just groups the records into, <i>good/bad</i>. Principal components 
 are essentially the continuous solutions to the discrete cluster membership 
 indicators of K -means clustering<sup><u><a href="http://ranger.uta.edu/~chqding/papers/KmeansPCA1.pdf"target="_blank">[1]
 </a></u></sup>. In other words, K-Means is a sparse version of PCA. We explore 
@@ -79,6 +80,7 @@ library(tidyverse) # The gas for the caR
 library(cluster) # Cluster Analysis
 library(factoextra) # Visualizing Clusters
 library(plotly) # Interactive Plots
+library(shiny) # Center Plotly charts
 library(gridExtra) # Plot graphs in grids
 library(DT) # Print HTML Tables
 library(knitr) # Generating HTML document
@@ -135,20 +137,20 @@ gather(data ,"industry","percentage") %>%
 
 K-Means clustering is one of the most commonly used unsupervised machine learning
 algorithms to group data into a pre-specified `K` clusters. The data points
-are assigned to the groups in such a way that the points are as similar to each other as
+are assigned to the clusters in such a way that they are as similar to each other as
 possible. Each cluster is represented by a <i>centroid</i>, which is a vector of 
 mean values of all columns. The within-cluster similarity is measured 
 through the sum of squares of the residuals between the centroid means and all
 data points assigned to that centroid. For each cluster, 
 
-<center>$$withinness(C_j) = \sum_{\substack{j\in 1:ncol \\ i\in 1:nrow}}{(x_{ij} - \mu_j)^2} $$</center>
+<center>$$withinness(C) = \sum_{\substack{j\in 1:ncol \\ i\in 1:nrow_{cluster}}}{(x_{ij} - \mu_j)^2} $$</center>
 
-* $C_j$ is the mean value of the column j in that cluster
-* $x_{ij}$ is the element belonging to row i and column j
-* $\mu_j$ is the average of the column j for all i in that cluster
+* $C$ is a vector of length `j`, which is the number of variables in the dataset
+* $x_{ij}$ is the element belonging to record `i` and column `j`
+* $\mu_j$ is the average of the column `j` for all `i` in that cluster
 <br>
 
-For reference, this excellent <u><a href="https://uc-r.github.io/kmeans_clustering"target="_blank">post</a></u>
+For reference, this <u><a href="https://uc-r.github.io/kmeans_clustering"target="_blank">excellent post</a></u>
 by Brad Boehmke goes into a lot more detail.
 <br>
 
@@ -208,7 +210,7 @@ geo_plot <- geo_data_played %>% plot_geo() %>%
             marker = list(line = l), showscale = FALSE) %>% 
   colorbar(title = "Scale") %>%
   layout(geo = g,
-         title = "Countries grouped based on employment",
+         title = "Countries grouped based on employment distribution",
          annotations = list(x = 0, y = 1, text = "Change clusters in dropdown",
                             showarrow = FALSE, xref = "paper", yref = "paper"))
 
@@ -221,7 +223,7 @@ for (col in geo_colnames[4:8]) {
 }
 
 # Add dropdown for clusters and set corresponding visibility 
-geo_plot %>%
+geo_plot <- geo_plot %>%
   layout(
     updatemenus = list(
       list(y = 0.9, x = 0.08,
@@ -246,11 +248,13 @@ geo_plot %>%
                   label = "7")
            )))) %>% 
   config(displayModeBar = FALSE) 
+
+div(geo_plot, align = "center")
 ```
 <font size = -1><i>As we already observed, the dataset contains East and West Germany, 
 Yugoslavia and other countries which do not exist in the maps anymore. If you don't
 see 7 colors for 7 clusters, that's  because the missing countries are not
-being represented on the map.</i></font><br>
+being plotted on the map.</i></font><br>
 
 We clearly see patterns emerging that we didn't know existed before. Countries
 that are geographically and culturally closer had similar employment patterns.
@@ -266,7 +270,7 @@ clusters. There are three major methods to determine K. <br>
 
 * `Elbow` - The number of clusters is plotted against the within residual sum 
 squares and the cluster where there is a sharp drop is considered optimal.  
-* `Average Silhouette` - The silhouette value is a measure of how similar an data 
+* `Average Silhouette` - The silhouette value is a measure of how similar a data 
 point is to its own cluster compared to other clusters. The optimal number of 
 clusters is the one that maximizes the average silhouette.
 * `Gap Statistic` - This method computes the within-cluster variations and compares
@@ -290,7 +294,7 @@ The result of the Elbow method is ambiguous, while three clusters have the
 highest average silhouette. The gap statistic method suggests one cluster as
 the optimum, which is impractical.<br>
 
-Going by the Silhouette method, three clusters broadly separate the data into 
+Going by the `Silhouette` method, three clusters broadly separate the data into 
 western and eastern Europe, leaving out Turkey and Yugoslavia into the third cluster.
 This seems <i>fair,</i> and the rest of the document will work with three clusters.
 
@@ -350,92 +354,79 @@ pca_model$scores %>% as.data.frame() %>% rownames_to_column("country") %>%
 
 # Matrix Algebra and Summary
 
+### For K-Means
+
 K-Means algorithm is essentially an optimization problem where the objective function
-is to come up with centroids such that, after cluster assignment, the residual 
+is to come up with centroids and cluster assignments such that, the residual 
 sum squares are minimized. Following what we saw earlier, this can be defined
-mathematically as
+in matrix terms as
 
 <br><center>$$minimize\ ||CW - X||^2 $$</center><br>
 
-* C denotes a matrix of mean values of all columns in different clusters of dimension
-`J` by `K` where J is the number of columns and K is the number of clusters.  
+* C denotes a matrix of mean values of all variables in different clusters. The dimension
+ is `J` by `K` where J is the number of variables in the dataset and K is the number 
+of clusters. Thus each column of matrix C represents a cluster.
 * W is the assignment matrix of dimension `K` rows and `I` columns where I is
-the number of rows.  
+the number of records in the dataset.  
 * X is the original data. The double vertical bar in the equation denotes the 
 Euclidean norm, which is root sum squares of the elements of the matrix.
 
 The figure below, from page 293 of the book<u><a href="https://docs.wixstatic.com/ugd/f09e45_6f190e621c5c48e48f67f99a50633ce0.pdf"
-target="_blank">Machine Learning Redifined</a></u> expresses the concept in a much
-better way.
+target="_blank">Machine Learning Redifined</a></u> illustrates the concept.
+![](https://raw.githubusercontent.com/mr-hn/kmeans-pca/master/MLRedefined.png)
 
+The point of note in the above figure is the matrix `W`. The constraint for solving
+the optimization problem of W is that each column should have one `1` and all other
+elements of the column must be `0`. That is, each point should belong to only one
+cluster.
+<br>
 
+### For PCA
 
+PCA solves the same objective function, with the only difference being that the
+"categorical" constraint on W is removed. It's the relaxed version of K-Means
+problem where
 
+* `C` is a matrix of principal components and
+* `W` is the matrix of eigen vectors, transposed
 
+The optimization solves for C and W to minimize the difference between C*W and X.
 
-
-
-The only constraint is that each of the data points 
-can belong to only one cluster
-
-
-In other words, K-means and PCA maximize the same objective function, with the only difference being that K-means has additional "categorical" constraint.
-
-
-
-PCA is relaxed stuff
-Throw in a little matrix and images. Credit quora.
-
-https://stats.stackexchange.com/questions/183236/what-is-the-relation-between-k-means-clustering-and-pca
-
-https://www.quora.com/What-is-the-relationship-between-K-means-and-PCA
-
-
-PCA is relaxed k means
-
-```{r}
-x <- data[,1:9] %>% as.matrix()
+```{r eval = FALSE}
+# Data matrixed and scaled. PCA models always scale data
+x <- data[,1:9] %>% as.matrix() %>% scale()
+# Principal Component scores 
 c <- pca_model$scores %>% as.data.frame() %>% as.matrix()
-
+# Eigen vectors
 w <- pca_model$loadings[1:9,1:9] %>% as.data.frame() %>%  as.matrix()
 
-# X times w is c
-scale(x) %*% (w) - c[1:26,1:9]
 
-# C times w inverse = x
-c[1:26,1:9] %*% solve(w) -  scale(x) 
+
+# Original data * Eigen vector - Principal Components = 0
+(x %*% w) - c
+
+# Origiganl Data - Principal Components * Inverse(Eigen vector) = 0
+x - (c %*% t(w))
+# Eigen vector is orthogonal, hence inverse(w) = transpose(w)
 ```
 
+### For Linear Regression
 
-For HOMEWORK
+Coming to think of it, the same minimization can be applied to <u><a href="http://mr-hn.github.io/classificationTech"target="_blank">generalized linear 
+regression</a></u> as well. The matrices in that case would be
 
+* `C` - The response values Y
+* `W` - The coefficients to be determined
 
-```{r fig.height=9, fig.width=6, warning=FALSE, message=FALSE, eval = FALSE}
-# ```{R}
-kmeans_model <- kmeans(data_scaled, 3, nstart = 25)
-fviz_cluster(kmeans_model, data = data_scaled) + theme_minimal() + ggtitle("My title")
+### Summary
 
-data$cluster <- kmeans_model$cluster
+Principal Component Analysis is one of the classic dimension reduction algorithms.
+While not particularly useful for predictive modeling, the fundamental matrix
+minimization problem helps to frame our understanding of other popular models
+such as K-Means and Linear Regression. Goes to prove the importance of underlying
+concepts in data science.
 
-data
-pca_model$scores
-pca_model$loadings
+<u><a href="https://www.linkedin.com/in/harish-morekonda/"target="_blank">LinkedIn</a></u>
 
-
-histo_viz <- list()
-for (i in colnames(data_scaled)) {
-  
-  mean_variable <- paste0('mean(', i, ')')
-  
-  histo_viz[[i]] <- data %>% group_by(cluster) %>%
-    summarize_(.dots = setNames(mean_variable, "mean")) %>%
-    ggplot(aes(cluster, mean)) + geom_col() + coord_flip() +
-    ylab(paste("Average", i)) + xlab("Cluster")
-  
-}
-
-grid.arrange(grobs = histo_viz, nrow = 3, ncol = 3, 
-             top = "Histograms to visualize data ranges" )
-
-```
-
+Here's a link to the repository - <u><a href="https://github.com/mr-hn/kmeans-pca"target="_blank">
+GitHub</a></u>
