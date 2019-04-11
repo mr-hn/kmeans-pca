@@ -104,7 +104,7 @@ The dataset contains the distribution of employment in different sectors of
 the country, and the remaining nine holding the percentage employment of the
 countries' citizens in nine different industries.
 ```{r}
-data <- read.table("https://raw.githubusercontent.com/mr-hn/kmeans-pca/master/european_jobs.txt", 
+data <- read.table("https://raw.githubusercontent.com/mr-hn/kmeansPca/master/european_jobs.txt", 
                    header = TRUE, sep = "\t")
 
 data_definitition <- data.frame(variable = colnames(data),
@@ -383,7 +383,7 @@ Euclidean norm, which is root sum squares of the elements of the matrix.
 
 The figure below, from page 293 of the book<u><a href="https://docs.wixstatic.com/ugd/f09e45_6f190e621c5c48e48f67f99a50633ce0.pdf"
 target="_blank">Machine Learning Redifined</a></u> illustrates the concept.
-![](https://raw.githubusercontent.com/mr-hn/kmeans-pca/master/MLRedefined.png)
+![](https://raw.githubusercontent.com/mr-hn/kmeansPca/master/MLRedefined.png)
 
 The point of note in the above figure is the matrix `W`. The constraint for solving
 the optimization problem of W is that each column should have one `1` and all other
@@ -438,5 +438,5 @@ concepts in data science.
 
 <u><a href="https://www.linkedin.com/in/harish-morekonda/"target="_blank">LinkedIn</a></u>
 
-Here's a link to the repository - <u><a href="https://github.com/mr-hn/kmeans-pca"target="_blank">
+Here's a link to the repository - <u><a href="https://github.com/mr-hn/kmeansPca"target="_blank">
 GitHub</a></u>
