@@ -49,18 +49,17 @@ options(DT.options = list(paging = FALSE, # disable pagination
 K-Means algorithm is one of the popular clustering analysis techniques, that helps
 group similar data points into clusters and look for hidden insights. For example,
 by analyzing sales data, customers can be grouped into segments to help
-understand their behaviour. In one of the <u><a href="https://some.link">earlier posts</a></u>, 
+understand their behaviour. In one of the <u><a href="https://some.link"target="_blank">earlier posts</a></u>, 
 we explored Principal Component Analysis, a dimension reduction tool that transforms 
 a number of (possibly) correlated columns into a (smaller) number of uncorrelated 
 columns called principal components.
-<br>
 
+<br>
 <div class = "grey"><font size = +1> <i>
 K-Means and PCA are thought of as two different procedures, having two different
 purposes and at first sight do not seem related. But that isn't true!
 </i> </font></div>
 <br>
-
 While principal components can help <i>rank</i> the records of the dataset, k-means
 just groups the records into, for example, <i>good/bad</i>. Thus, K-Means is a 
 sparse version of PCA. We explore this idea more with the European employment 
@@ -110,40 +109,69 @@ from at least from or before the 80's. Data is read in and a box plot of
 distributions in each industries in presented below.
 
 ```{r out.width="100%"}
-data <- read.table("european_jobs.txt", header = TRUE, sep = "\t")
+data <- read.table("https://raw.githubusercontent.com/mr-hn/kmeans-pca/master/european_jobs2.txt", 
+                   header = TRUE, sep = "\t")
 rownames(data) <- data[,"Country"]
 data <- data[,-1]
+
+data %>% datatable(caption = "The Raw Data")
 
 gather(data ,"industry","percentage") %>% 
   plot_ly(x = ~industry, y = ~percentage, type = "box",
           hoverinfo = "text",
-          text = ~paste(rownames(data), "-", percentage))
+          text = ~paste0(rownames(data), " - ", percentage,"%"),
+          line = list(color = "rgb(159, 33, 66)"),
+          marker = list(color = "rgb(33, 17, 3)")) %>% 
+  layout(title = "Distribution of employments in different sectors - Europe, 1980\'s",
+         xaxis = list(title = "Industries"),
+         yaxis = list(title = "")) %>% 
+  config(displayModeBar = F)
 ```
 
-# What K-Means is and how it works
+# K-Means Basics
 
+K-Means clustering is one of the most commonly used unsupervised machine learning
+algorithms to group data into a pre-specified <i>K</i> clusters. The data points
+are assigned to the groups in such a way that the data points are as similar as
+possible. Each cluster is represented by a <i>centroid</i>, which is the mean
+value of all the data points in it. The within-cluster similarity is measured 
+through the sum of squares of the residuals between the centroid and all other
+data points assigned to that centroid.
 
-K-Means algorithm is essentially an optimization problem where the objective function
-is to come up with centroids such that the residual sum squares is minimized.
-The only constraint is that each of the data points can belong to only one cluster.
+<center>$$withinness(C_k) = \sum_{k\in C_k}{(x_{ik} - \mu_k)^2} $$</center>
 
+* $C_k$ is cluster K
+* $x_{ik}$ is a data point belonging to a centroid K
+* $\mu_k$ is the average of all data points in cluster K
+<br>
 
-In other words, K-means and PCA maximize the same objective function, with the only difference being that K-means has additional "categorical" constraint.
+For reference, this excellent <u><a href="https://uc-r.github.io/kmeans_clustering"target="_blank">post</a></u>
+by Brad Boehmke goes into a lot more detail.
+<br>
 
+The K-Means algorithm is applied to the dataset with the clusters varying between
+2 to 7. The countries are colored based on the cluster they are assigned to and 
+presented below on the chloropleth. The number of clusters can be changed from
+the dropdown. For two clusters, the algorithm pits Turkey against the rest of the 
+Europe. With seven clusters, we see the countries separated broadly into the 
+central Europe, the Mediterranean, East and Scandinavia. Turkey and Hungary are
+in their own clusters.
 
-PCA is relaxed k means
-
-
-```{r out.width=="100"}
+```{r out.width=="100", fig.align="center"}
+# K-Means requires data to be scaled normally N(0,1).
+# This is to make Euclidean distance measurement comparable.
 data_scaled <- scale(data) %>% as.data.frame()
 
+# Country code is combined to plot on map
 country_code <- read_csv("country_code.csv") %>% 
   rename(country = "COUNTRY", code = "CODE")
+data_kmeans <- data_scaled %>% rownames_to_column("country") %>% 
+  left_join(country_code, by = "country") 
 
-data_kmeans <- data_scaled %>% rownames_to_column("country") %>% left_join(country_code, by = "country") 
-
+# Combining the results of K-Means algorithm
 data_kmeans$k <- 0
 data_kmeans$cluster <- 0
+# Into geo_data
 geo_data <- NULL
 
 for (i in 2:7) {
@@ -153,27 +181,35 @@ for (i in 2:7) {
   geo_data <- geo_data %>% bind_rows(data_kmeans)
 }
 
+# Drop unnecessary columns
 geo_data <- geo_data %>% select(country, code, k, cluster)
 
+# Change data structure for Plotly
 geo_data_played <- geo_data %>% spread(k, cluster, sep = "value")
 geo_colnames <- colnames(geo_data_played)
 
-# Plotly settings
+# Plotluy Chloropleth settings
 l <- list(color = toRGB("grey"), width = 0.5)
 g <- list(showframe = FALSE, 
-          lonaxis = list(range = c(-20, 50)),
-          lataxis = list(range = c(30, 90)),
+          # lonaxis = list(range = c(-20, 50)),
+          # lataxis = list(range = c(30, 90)),
+          lonaxis = list(range = c(-10, 50)),
+          lataxis = list(range = c(30, 80)),
           showcoastlines = FALSE,
           projection = list(type = 'Mercator'))
 
-# Filter data
+# Build plot with data for two clusters visible
 geo_plot <- geo_data_played %>% plot_geo() %>%
   add_trace(z = ~kvalue2, color = ~kvalue2, 
             text = ~country, locations = ~code, 
             marker = list(line = l), showscale = FALSE) %>% 
   colorbar(title = "Scale") %>%
-  layout(geo = g)
+  layout(geo = g,
+         title = "Countries grouped based on employment",
+         annotations = list(x = 0, y = 1, text = "Change clusters in dropdown",
+                            showarrow = FALSE, xref = "paper", yref = "paper"))
 
+# Add plots for clusters 3:7 invisible
 for (col in geo_colnames[4:8]) {
   geo_plot <- geo_plot %>% 
     add_trace(z = geo_data_played[[col]], color = geo_data_played[[col]], 
@@ -181,11 +217,11 @@ for (col in geo_colnames[4:8]) {
               marker = list(line = l), showscale = FALSE, visible = FALSE) 
 }
 
+# Add dropdown for clusters and set corresponding visibility 
 geo_plot %>%
   layout(
-    title = "Employment in Europe - Change Number of Clusters in Dropdown",
     updatemenus = list(
-      list(y = 1, x = 0.01,
+      list(y = 0.9, x = 0.08,
            buttons = list(
              list(method = "restyle",
                   args = list("visible", list(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE)),
@@ -206,96 +242,104 @@ geo_plot %>%
                   args = list("visible", list(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE)),
                   label = "7")
            )))) %>% 
-  config(displayModeBar = F)
+  config(displayModeBar = FALSE) 
+```
+<font size = -1><i>As we already observed, the dataset contains East and West Germany, 
+Yugoslavia and other countries which do not exist in the maps anymore. If you do
+not see 7 colors for 7 clusters, that's  because the missing countries are not
+being represented on the map</i></font><br>
+
+We clearly see patterns emerging that we didn't know existed before. Countries
+that are geographically and culturally closer had similar employment patterns.
+Unsupervised learning thus helped us draw inferences without a labelled response
+in the input dataset.
+
+## Determining the optimal number of clusters
+
+Because the data was on a map, it was easier for us to say that 7 clusters 
+grouped the data better than 2. But in other cases where the output may not be
+easily interpretable, it becomes essential to be definite about the number of
+clusters. There are three major methods to determine K. <br>
+
+* `Elbow` - The number of clusters is plotted against the within residual sum 
+squares and the cluster where there is a sharp drop is considered optimal.  
+* `Average Silhouette` - The silhouette value is a measure of how similar an data 
+point is to its own cluster compared to other clusters. The optimal number of 
+clusters is the one that maximizes the average silhouette.
+* `Gap Statistic` - This method computes the within-cluster variations and compares
+them against the clusters of another randomly generated reference dataset. The K
+that gives the highest difference is considered optimal.
+
+```{r out.width="100%"}
+plot1 <- fviz_nbclust(data_scaled, kmeans, method = "wss") +
+  ggtitle("By Elbow Method") + xlab("") + theme(text = element_text(size = 8))
+plot2 <- fviz_nbclust(data_scaled, kmeans, method = "silhouette") +
+  ggtitle("By Silhouette Method") + xlab("") + theme(text = element_text(size = 8))
+set.seed(1804)
+gap_stat <- clusGap(data_scaled, FUN = kmeans, nstart = 25, K.max = 12, B = 50)
+plot3 <- fviz_gap_stat(gap_stat) +
+  ggtitle("By Gap Statistic") + xlab("") + theme(text = element_text(size = 8))
+
+grid.arrange(plot1, plot2, plot3, nrow = 2, ncol = 2)
 ```
 
-Plot this on a map
+The result of the Elbow method is ambiguous, while three clusters have the 
+highest average silhouette. The gap statistic method suggests one cluster as
+the optimum, which is impractical.<br>
 
-# Determine the optimal number of clusters
-
-
-Plot each and say inconclusive.
-## Elbow
-```{r}
-
-fviz_nbclust(data_scaled, kmeans, method = "wss")
-
-```
-I would say 5 is a good number as you can say that's where the distinct bend
-
-## Silhouette
+Going by the Silhouette method, three clusters broadly separate the data into 
+western and eastern Europe, leaving out Turkey and Yugoslavia into the third cluster.
+This seems <i>fair,</i> and the rest of the document will work with three clusters.
 
 ```{r}
+data$cluster <- kmeans(data_scaled, 3, nstart = 25)$cluster %>% as.numeric()
 
-fviz_nbclust(data_scaled, kmeans, method = "silhouette")
-
-```
-
-## Gap Statistic
-
-```{r}
-set.seed(123)
-gap_stat <- clusGap(data_scaled, FUN = kmeans, nstart = 25,
-                    K.max = 12, B = 50)
-
-fviz_gap_stat(gap_stat)
-
-```
-
-# Principal Component Analysis
-
-PCA is relaxed stuff
-Throw in a little matrix and images. Credit quora.
-
-https://stats.stackexchange.com/questions/183236/what-is-the-relation-between-k-means-clustering-and-pca
-
-https://www.quora.com/What-is-the-relationship-between-K-means-and-PCA
-
-
-In our case, comp1 and comp2 explains
-```{r}
-pca <- princomp(data, cor = TRUE)
-# summary(pca, loadings = TRUE, scores = TRUE)
-pca$scores %>% as.data.frame() %>% select(Comp.1, Comp.2) %>% ggplot(aes(Comp.1, Comp.2)) +
-  geom_point() + theme_minimal() + 
-  geom_text(label=rownames(data), nudge_x = 0.25, nudge_y = 0.25, check_overlap = T)
-```
-Now k-means
-```{r}
-data$cluster <- kmeans(data_scaled, 3, nstart = 25)$cluster
-# yaxis <- rnorm(n = nrow(data), mean = 1, sd = 1)
-# data$yaxis <- yaxis
-
-# a <- data %>% 
-#   ggplot(aes(x = 1:nrow(data), fill = as.character(cluster))) + 
-#   theme_minimal() +
-#   geom_col(aes(y = cluster)) +
-#   geom_text(aes(y = cluster), label = rownames(data), check_overlap = T) +
-#   theme(legend.position = "none", axis.ticks.x = element_blank(), axis.text.x = element_blank(),
-#         axis.title = element_blank())
-# 
-# a %>% ggplotly()
-
-data %>% rownames_to_column("country") %>%
-  ggplot(aes(country, color = as.factor(cluster))) + 
-  coord_flip() + theme_minimal() + geom_text(aes(y = 1),label = rownames(data)) +
+data %>% rownames_to_column("country") %>% 
+  ggplot(aes(x = reorder(country, cluster), color = as.factor(cluster))) + 
+  geom_text(aes(y = 1),label = rownames(data)) +
+  coord_flip() + theme_minimal() +
   theme(legend.position = "none", axis.ticks = element_blank(), axis.text = element_blank(),
         axis.title = element_blank(),
         panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 ```
 
+# Merging Results with Principal Components
 
-Now Cluster applied on top of it. 
+PCA model is applied to the data and the results are printed below. It's observed
+that the first three components explain ~76% of the variance. We will be utilizing
+only the three components to make plotting possible.
 ```{r}
-kmeans_model <- kmeans(data_scaled, 3, nstart = 25)
+pca_model <- princomp(data, cor = TRUE) %>% summary(loadings = TRUE)
+eigen_values <- pca_model$sdev^2
 
-# pca$scores %>% as.data.frame() %>% select(Comp.1, Comp.2) %>% 
-#   bind_cols(data %>% select(cluster)) %>% 
-#   ggplot(aes(Comp.1, Comp.2, col = as.factor(cluster))) +
-#   geom_point() + theme_minimal() + theme(legend.position = "none") + 
-#   xlab("Principal Component 1") + ylab("Principal Component 2") +
-#   geom_text(label = rownames(data), nudge_x = 0.25, nudge_y = 0.25, check_overlap = T)
+pca_model$sdev %>% as.data.frame() %>% rownames_to_column("component") %>% 
+  bind_cols(eigen_value = round(sqrt(eigen_values), 3),
+            proportion = round(eigen_values/sum(eigen_values), 3),
+            cumulative = round(cumsum(eigen_values)/sum(eigen_values), 3)) %>% 
+  select(component, eigen_value, proportion, cumulative) %>% 
+  datatable(caption = "Results of Principal Component")
 ```
+
+
+```{r out.width="100%"}
+pca_model$scores %>% as.data.frame() %>% rownames_to_column("country") %>% 
+  bind_cols(data) %>% select(Comp.1, Comp.2, Comp.3, cluster, country) %>% 
+  rename("component_1" = Comp.1, "component_2" = Comp.2, "component_3" = Comp.3) %>% 
+  plot_ly(x = ~component_1, y = ~component_2, z = ~component_3, color = ~cluster,
+          hoverinfo = "text",
+          text = ~paste(country, "\n",
+                        "Component 1 =", round(component_1, 3),"\n",
+                        "Component 2 =", round(component_2, 3),"\n",
+                        "Component 3 =", round(component_3, 3),"\n")) %>% 
+  add_markers() %>% hide_colorbar() %>% 
+  layout(scene = list(xaxis = list(title = 'Component 1'),
+                      yaxis = list(title = 'Component 2'),
+                      zaxis = list(title = 'Component 3'))) 
+```
+
+While, PCA assigned each country to a point in a 3-dimensional plane, the role
+of K-Means is only to assign each country to one of the K clusters. Thus a K-Means
+model with n clusters, where n is the number of data points will essentially be a PCA.
 
 Goes to show that PCA is one step on top of k-means
 ```{r}
@@ -314,6 +358,25 @@ kmeans_model <- kmeans(data_scaled, 7, nstart = 25)
 fviz_cluster(kmeans_model, data = data_scaled) + theme_minimal() + ggtitle("My title")
 
 ```
+
+# K-Means in Matrix Form
+K-Means algorithm is essentially an optimization problem where the objective function
+is to come up with centroids such that the residual sum squares is minimized.
+The only constraint is that each of the data points can belong to only one cluster.
+
+
+In other words, K-means and PCA maximize the same objective function, with the only difference being that K-means has additional "categorical" constraint.
+
+
+PCA is relaxed stuff
+Throw in a little matrix and images. Credit quora.
+
+https://stats.stackexchange.com/questions/183236/what-is-the-relation-between-k-means-clustering-and-pca
+
+https://www.quora.com/What-is-the-relationship-between-K-means-and-PCA
+
+
+PCA is relaxed k means
 
 
 For HOMEWORK
