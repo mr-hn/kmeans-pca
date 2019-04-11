@@ -72,8 +72,18 @@ similarities between the two techniques.
 
 # Required Packages
 
-The packages listed below in the code chunk are required to replicate this
-project and generate this HTML document.
+The packages listed below are required to replicate this project and generate this
+HTML document.
+
+* `tidyverse` - The gas for the caR
+* `cluster` - Cluster Analysis
+* `factoextra` - Visualizing Clusters
+* `plotly` - Interactive Plots
+* `shiny` - Center Plotly charts
+* `gridExtra` - Plot graphs in grids
+* `DT` - Print HTML Tables
+* `knitr` - Generating HTML document
+* `rmdformats` - Document theme
 
 ```{r, eval = FALSE}
 library(tidyverse) # The gas for the caR
@@ -256,7 +266,7 @@ Yugoslavia and other countries which do not exist in the maps anymore. If you do
 see 7 colors for 7 clusters, that's  because the missing countries are not
 being plotted on the map.</i></font><br>
 
-We clearly see patterns emerging that we didn't know existed before. Countries
+We clearly see patterns emerging that we didn't of before. Countries
 that are geographically and culturally closer had similar employment patterns.
 Unsupervised learning thus helped us draw inferences without a labelled response
 in the input dataset.
@@ -412,7 +422,7 @@ x - (c %*% t(w))
 
 ### For Linear Regression
 
-Coming to think of it, the same minimization can be applied to <u><a href="http://mr-hn.github.io/classificationTech"target="_blank">generalized linear 
+Come to think of it, the same minimization can be applied to <u><a href="http://mr-hn.github.io/classificationTech"target="_blank">generalized linear 
 regression</a></u> as well. The matrices in that case would be
 
 * `C` - The response values Y
@@ -423,7 +433,7 @@ regression</a></u> as well. The matrices in that case would be
 Principal Component Analysis is one of the classic dimension reduction algorithms.
 While not particularly useful for predictive modeling, the fundamental matrix
 minimization problem helps to frame our understanding of other popular models
-such as K-Means and Linear Regression. Goes to prove the importance of underlying
+such as K-Means and Linear Regression. Just goes to prove the importance of underlying
 concepts in data science.
 
 <u><a href="https://www.linkedin.com/in/harish-morekonda/"target="_blank">LinkedIn</a></u>
