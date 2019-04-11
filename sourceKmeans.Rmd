@@ -61,10 +61,13 @@ purposes and at first sight do not seem related. But that isn't true!
 </i> </font></div>
 <br>
 While principal components can help <i>rank</i> the records of the dataset, k-means
-just groups the records into, for example, <i>good/bad</i>. Thus, K-Means is a 
-sparse version of PCA. We explore this idea more with the European employment 
-dataset by grouping similar countries. The Principal Components are then combined
-with the results of K-Means to see the similarities between the two techniques.
+just groups the records into, for example, <i>good/bad</i>. Principal components 
+are essentially the continuous solutions to the discrete cluster membership 
+indicators of K -means clustering<sup><u><a href="http://ranger.uta.edu/~chqding/papers/KmeansPCA1.pdf"target="_blank">[1]
+</a></u></sup>. In other words, K-Means is a sparse version of PCA. We explore 
+this idea more with the European employment dataset by grouping similar countries. 
+The Principal Components are then combined with the results of K-Means to see the 
+similarities between the two techniques.
 
 # Required Packages
 
@@ -89,8 +92,10 @@ The dataset contains the distribution of employment in different sectors of
 the country, and the remaining nine holding the percentage employment of the
 countries' citizens in nine different industries.
 ```{r}
-data_definitition <- data.frame(variable = c("Country", "Agr", "Min", "Man", "PS",
-                                             "Con", "SI", "Fin", "SPS", "TC"),
+data <- read.table("https://raw.githubusercontent.com/mr-hn/kmeans-pca/master/european_jobs.txt", 
+                   header = TRUE, sep = "\t")
+
+data_definitition <- data.frame(variable = colnames(data),
                                 description = c("Name of the country",
                                                 "Percentage employed in agriculture",
                                                 "Percentage employed in mining",
@@ -109,8 +114,6 @@ from at least from or before the 80's. Data is read in and a box plot of
 distributions in each industries in presented below.
 
 ```{r out.width="100%"}
-data <- read.table("https://raw.githubusercontent.com/mr-hn/kmeans-pca/master/european_jobs2.txt", 
-                   header = TRUE, sep = "\t")
 rownames(data) <- data[,"Country"]
 data <- data[,-1]
 
@@ -131,18 +134,18 @@ gather(data ,"industry","percentage") %>%
 # K-Means Basics
 
 K-Means clustering is one of the most commonly used unsupervised machine learning
-algorithms to group data into a pre-specified <i>K</i> clusters. The data points
-are assigned to the groups in such a way that the data points are as similar as
-possible. Each cluster is represented by a <i>centroid</i>, which is the mean
-value of all the data points in it. The within-cluster similarity is measured 
-through the sum of squares of the residuals between the centroid and all other
-data points assigned to that centroid.
+algorithms to group data into a pre-specified `K` clusters. The data points
+are assigned to the groups in such a way that the points are as similar to each other as
+possible. Each cluster is represented by a <i>centroid</i>, which is a vector of 
+mean values of all columns. The within-cluster similarity is measured 
+through the sum of squares of the residuals between the centroid means and all
+data points assigned to that centroid. For each cluster, 
 
-<center>$$withinness(C_k) = \sum_{k\in C_k}{(x_{ik} - \mu_k)^2} $$</center>
+<center>$$withinness(C_j) = \sum_{\substack{j\in 1:ncol \\ i\in 1:nrow}}{(x_{ij} - \mu_j)^2} $$</center>
 
-* $C_k$ is cluster K
-* $x_{ik}$ is a data point belonging to a centroid K
-* $\mu_k$ is the average of all data points in cluster K
+* $C_j$ is the mean value of the column j in that cluster
+* $x_{ij}$ is the element belonging to row i and column j
+* $\mu_j$ is the average of the column j for all i in that cluster
 <br>
 
 For reference, this excellent <u><a href="https://uc-r.github.io/kmeans_clustering"target="_blank">post</a></u>
@@ -245,9 +248,9 @@ geo_plot %>%
   config(displayModeBar = FALSE) 
 ```
 <font size = -1><i>As we already observed, the dataset contains East and West Germany, 
-Yugoslavia and other countries which do not exist in the maps anymore. If you do
-not see 7 colors for 7 clusters, that's  because the missing countries are not
-being represented on the map</i></font><br>
+Yugoslavia and other countries which do not exist in the maps anymore. If you don't
+see 7 colors for 7 clusters, that's  because the missing countries are not
+being represented on the map.</i></font><br>
 
 We clearly see patterns emerging that we didn't know existed before. Countries
 that are geographically and culturally closer had similar employment patterns.
@@ -306,10 +309,10 @@ data %>% rownames_to_column("country") %>%
 # Merging Results with Principal Components
 
 PCA model is applied to the data and the results are printed below. It's observed
-that the first three components explain ~76% of the variance. We will be utilizing
-only the three components to make plotting possible.
+that the first three components explain ~75% of the variance. We will be utilizing
+only the three components to make plotting graphs possible.
 ```{r}
-pca_model <- princomp(data, cor = TRUE) %>% summary(loadings = TRUE)
+pca_model <- princomp(data[1:9], cor = TRUE) %>% summary(loadings = TRUE)
 eigen_values <- pca_model$sdev^2
 
 pca_model$sdev %>% as.data.frame() %>% rownames_to_column("component") %>% 
@@ -317,16 +320,21 @@ pca_model$sdev %>% as.data.frame() %>% rownames_to_column("component") %>%
             proportion = round(eigen_values/sum(eigen_values), 3),
             cumulative = round(cumsum(eigen_values)/sum(eigen_values), 3)) %>% 
   select(component, eigen_value, proportion, cumulative) %>% 
-  datatable(caption = "Results of Principal Component")
+  datatable(caption = "Eigen Values of Principal Component Analysis")
 ```
 
+The data points are plotted on a 3-D plane of the first three principal components
+and the results from clustering are rendered as colors. The output makes it apparent
+how closely PCA and K-Means are related. While, PCA assigns each country to a point 
+in the 3-dimensional plane, the role of K-Means is only to assign the country to 
+one of the K clusters.
 
 ```{r out.width="100%"}
 pca_model$scores %>% as.data.frame() %>% rownames_to_column("country") %>% 
   bind_cols(data) %>% select(Comp.1, Comp.2, Comp.3, cluster, country) %>% 
   rename("component_1" = Comp.1, "component_2" = Comp.2, "component_3" = Comp.3) %>% 
   plot_ly(x = ~component_1, y = ~component_2, z = ~component_3, color = ~cluster,
-          hoverinfo = "text",
+          hoverinfo = "text", mode = "markers",
           text = ~paste(country, "\n",
                         "Component 1 =", round(component_1, 3),"\n",
                         "Component 2 =", round(component_2, 3),"\n",
@@ -334,38 +342,45 @@ pca_model$scores %>% as.data.frame() %>% rownames_to_column("country") %>%
   add_markers() %>% hide_colorbar() %>% 
   layout(scene = list(xaxis = list(title = 'Component 1'),
                       yaxis = list(title = 'Component 2'),
-                      zaxis = list(title = 'Component 3'))) 
+                      zaxis = list(title = 'Component 3'),
+                      camera = list(eye = list(x = 1, y = -1, z = 1),
+                                    up = list(x = 0, y = 0, z = 1))),
+         title = "Data plotted against the three principal components") 
 ```
 
-While, PCA assigned each country to a point in a 3-dimensional plane, the role
-of K-Means is only to assign each country to one of the K clusters. Thus a K-Means
-model with n clusters, where n is the number of data points will essentially be a PCA.
+# Matrix Algebra and Summary
 
-Goes to show that PCA is one step on top of k-means
-```{r}
-
-pca <- princomp(data, cor = TRUE)
-data
-summary(pca, loadings = TRUE, scores = TRUE)
-pca$scores
-pca_kmeans_model <- pca$scores %>% as.data.frame() %>% select(Comp.1, Comp.2) %>% 
-  kmeans(centers = 7, nstart = 25)
-
-fviz_cluster(pca_kmeans_model, data = data) + theme_minimal() + ggtitle("My title")
-
-
-kmeans_model <- kmeans(data_scaled, 7, nstart = 25)
-fviz_cluster(kmeans_model, data = data_scaled) + theme_minimal() + ggtitle("My title")
-
-```
-
-# K-Means in Matrix Form
 K-Means algorithm is essentially an optimization problem where the objective function
-is to come up with centroids such that the residual sum squares is minimized.
-The only constraint is that each of the data points can belong to only one cluster.
+is to come up with centroids such that, after cluster assignment, the residual 
+sum squares are minimized. Following what we saw earlier, this can be defined
+mathematically as
+
+<br><center>$$minimize\ ||CW - X||^2 $$</center><br>
+
+* C denotes a matrix of mean values of all columns in different clusters of dimension
+`J` by `K` where J is the number of columns and K is the number of clusters.  
+* W is the assignment matrix of dimension `K` rows and `I` columns where I is
+the number of rows.  
+* X is the original data. The double vertical bar in the equation denotes the 
+Euclidean norm, which is root sum squares of the elements of the matrix.
+
+The figure below, from page 293 of the book<u><a href="https://docs.wixstatic.com/ugd/f09e45_6f190e621c5c48e48f67f99a50633ce0.pdf"
+target="_blank">Machine Learning Redifined</a></u> expresses the concept in a much
+better way.
+
+
+
+
+
+
+
+
+The only constraint is that each of the data points 
+can belong to only one cluster
 
 
 In other words, K-means and PCA maximize the same objective function, with the only difference being that K-means has additional "categorical" constraint.
+
 
 
 PCA is relaxed stuff
@@ -378,18 +393,33 @@ https://www.quora.com/What-is-the-relationship-between-K-means-and-PCA
 
 PCA is relaxed k means
 
+```{r}
+x <- data[,1:9] %>% as.matrix()
+c <- pca_model$scores %>% as.data.frame() %>% as.matrix()
+
+w <- pca_model$loadings[1:9,1:9] %>% as.data.frame() %>%  as.matrix()
+
+# X times w is c
+scale(x) %*% (w) - c[1:26,1:9]
+
+# C times w inverse = x
+c[1:26,1:9] %*% solve(w) -  scale(x) 
+```
+
 
 For HOMEWORK
 
 
-```{r fig.height=9, fig.width=6, warning=FALSE, message=FALSE}
+```{r fig.height=9, fig.width=6, warning=FALSE, message=FALSE, eval = FALSE}
 # ```{R}
-kmeans_model <- kmeans(data_scaled, 5, nstart = 25)
+kmeans_model <- kmeans(data_scaled, 3, nstart = 25)
 fviz_cluster(kmeans_model, data = data_scaled) + theme_minimal() + ggtitle("My title")
 
 data$cluster <- kmeans_model$cluster
 
-
+data
+pca_model$scores
+pca_model$loadings
 
 
 histo_viz <- list()
@@ -406,7 +436,6 @@ for (i in colnames(data_scaled)) {
 
 grid.arrange(grobs = histo_viz, nrow = 3, ncol = 3, 
              top = "Histograms to visualize data ranges" )
-
 
 ```
 
