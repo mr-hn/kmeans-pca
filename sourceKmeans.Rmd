@@ -1,0 +1,349 @@
+---
+title: "K-Means Clustering - A Sparse Version of Principal Component Analysis"
+author: Harish M
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+    code_folding: hide
+---
+
+<!-- Custom CSS styles -->
+<style>
+div.grey {
+background-color:#eeeeee;
+border-radius: 5px;
+padding: 20px;}
+</style>
+
+```{r warning = FALSE, message = FALSE, echo = FALSE}
+library(tidyverse) # The gasoline for the CaR
+library(cluster) # Cluster Analysis
+library(factoextra) # Visualizing Clusters
+library(plotly) # Interactive Plots
+library(gridExtra) # Plot graphs in grids
+library(DT) # Print HTML Tables
+library(knitr) # Generating HTML document
+library(rmdformats) # Document theme
+
+# Globally controlling code blocks
+opts_chunk$set(message = FALSE, 
+               warning = FALSE, 
+               fig.align = "center",
+               fig.height = 4,
+               fig.width = 6)
+# DT::datatable parameters
+options(DT.options = list(paging = FALSE, # disable pagination
+                          scrollY = "200px", # enable vertical scrolling
+                          scrollX = TRUE, # enable horizontal scrolling
+                          scrollCollapse = TRUE,
+                          # autoWidth = TRUE, # centering the table output
+                          ordering = FALSE, # disable sorting data
+                          dom = "t"))  # display just the table
+```
+
+# Introduction
+
+K-Means algorithm is one of the popular clustering analysis techniques, that helps
+group similar data points into clusters and look for hidden insights. For example,
+by analyzing sales data, customers can be grouped into segments to help
+understand their behaviour. In one of the <u><a href="https://some.link">earlier posts</a></u>, 
+we explored Principal Component Analysis, a dimension reduction tool that transforms 
+a number of (possibly) correlated columns into a (smaller) number of uncorrelated 
+columns called principal components.
+<br>
+
+<div class = "grey"><font size = +1> <i>
+K-Means and PCA are thought of as two different procedures, having two different
+purposes and at first sight do not seem related. But that isn't true!
+</i> </font></div>
+<br>
+
+While principal components can help <i>rank</i> the records of the dataset, k-means
+just groups the records into, for example, <i>good/bad</i>. Thus, K-Means is a 
+sparse version of PCA. We explore this idea more with the European employment 
+dataset by grouping similar countries. The Principal Components are then combined
+with the results of K-Means to see the similarities between the two techniques.
+
+# Required Packages
+
+The packages listed below in the code chunk are required to replicate this
+project and generate this HTML document.
+
+```{r, eval = FALSE}
+library(tidyverse) # The gas for the caR
+library(cluster) # Cluster Analysis
+library(factoextra) # Visualizing Clusters
+library(plotly) # Interactive Plots
+library(gridExtra) # Plot graphs in grids
+library(DT) # Print HTML Tables
+library(knitr) # Generating HTML document
+library(rmdformats) # Document theme
+```
+
+# Data
+
+The dataset contains the distribution of employment in different sectors of
+26 European countries. There are ten variables, the first being the name of
+the country, and the remaining nine holding the percentage employment of the
+countries' citizens in nine different industries.
+```{r}
+data_definitition <- data.frame(variable = c("Country", "Agr", "Min", "Man", "PS",
+                                             "Con", "SI", "Fin", "SPS", "TC"),
+                                description = c("Name of the country",
+                                                "Percentage employed in agriculture",
+                                                "Percentage employed in mining",
+                                                "Percentage employed in manufacturing",
+                                                "Percentage employed in power supply industries",
+                                                "Percentage employed in construction",
+                                                "Percentage employed in service industries",
+                                                "Percentage employed in finance",
+                                                "Percentage employed in social and personal services",
+                                                "Percentage employed in transport and communications"))
+data_definitition %>% datatable(caption = "Variable Descriptions")
+```
+
+The dataset seems to contain USSR and East Germany, so I'm assuming this comes
+from at least from or before the 80's. Data is read in and a box plot of 
+distributions in each industries in presented below.
+
+```{r out.width="100%"}
+data <- read.table("european_jobs.txt", header = TRUE, sep = "\t")
+rownames(data) <- data[,"Country"]
+data <- data[,-1]
+
+gather(data ,"industry","percentage") %>% 
+  plot_ly(x = ~industry, y = ~percentage, type = "box",
+          hoverinfo = "text",
+          text = ~paste(rownames(data), "-", percentage))
+```
+
+# What K-Means is and how it works
+
+
+K-Means algorithm is essentially an optimization problem where the objective function
+is to come up with centroids such that the residual sum squares is minimized.
+The only constraint is that each of the data points can belong to only one cluster.
+
+
+In other words, K-means and PCA maximize the same objective function, with the only difference being that K-means has additional "categorical" constraint.
+
+
+PCA is relaxed k means
+
+
+```{r out.width=="100"}
+data_scaled <- scale(data) %>% as.data.frame()
+
+country_code <- read_csv("country_code.csv") %>% 
+  rename(country = "COUNTRY", code = "CODE")
+
+data_kmeans <- data_scaled %>% rownames_to_column("country") %>% left_join(country_code, by = "country") 
+
+data_kmeans$k <- 0
+data_kmeans$cluster <- 0
+geo_data <- NULL
+
+for (i in 2:7) {
+  kmeans_model <- kmeans(data_scaled, i, nstart = 25)
+  data_kmeans$cluster <- kmeans_model$cluster
+  data_kmeans$k <- i
+  geo_data <- geo_data %>% bind_rows(data_kmeans)
+}
+
+geo_data <- geo_data %>% select(country, code, k, cluster)
+
+geo_data_played <- geo_data %>% spread(k, cluster, sep = "value")
+geo_colnames <- colnames(geo_data_played)
+
+# Plotly settings
+l <- list(color = toRGB("grey"), width = 0.5)
+g <- list(showframe = FALSE, 
+          lonaxis = list(range = c(-20, 50)),
+          lataxis = list(range = c(30, 90)),
+          showcoastlines = FALSE,
+          projection = list(type = 'Mercator'))
+
+# Filter data
+geo_plot <- geo_data_played %>% plot_geo() %>%
+  add_trace(z = ~kvalue2, color = ~kvalue2, 
+            text = ~country, locations = ~code, 
+            marker = list(line = l), showscale = FALSE) %>% 
+  colorbar(title = "Scale") %>%
+  layout(geo = g)
+
+for (col in geo_colnames[4:8]) {
+  geo_plot <- geo_plot %>% 
+    add_trace(z = geo_data_played[[col]], color = geo_data_played[[col]], 
+              text = ~country, locations = ~code, 
+              marker = list(line = l), showscale = FALSE, visible = FALSE) 
+}
+
+geo_plot %>%
+  layout(
+    title = "Employment in Europe - Change Number of Clusters in Dropdown",
+    updatemenus = list(
+      list(y = 1, x = 0.01,
+           buttons = list(
+             list(method = "restyle",
+                  args = list("visible", list(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE)),
+                  label = "2"),
+             list(method = "restyle",
+                  args = list("visible",list(FALSE, TRUE, FALSE, FALSE, FALSE, FALSE)),
+                  label = "3"),
+             list(method = "restyle",
+                  args = list("visible", list(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE)),
+                  label = "4"),
+             list(method = "restyle",
+                  args = list("visible", list(FALSE, FALSE, FALSE, TRUE, FALSE, FALSE)),
+                  label = "5"),
+             list(method = "restyle",
+                  args = list("visible", list(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE)),
+                  label = "6"),
+             list(method = "restyle",
+                  args = list("visible", list(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE)),
+                  label = "7")
+           )))) %>% 
+  config(displayModeBar = F)
+```
+
+Plot this on a map
+
+# Determine the optimal number of clusters
+
+
+Plot each and say inconclusive.
+## Elbow
+```{r}
+
+fviz_nbclust(data_scaled, kmeans, method = "wss")
+
+```
+I would say 5 is a good number as you can say that's where the distinct bend
+
+## Silhouette
+
+```{r}
+
+fviz_nbclust(data_scaled, kmeans, method = "silhouette")
+
+```
+
+## Gap Statistic
+
+```{r}
+set.seed(123)
+gap_stat <- clusGap(data_scaled, FUN = kmeans, nstart = 25,
+                    K.max = 12, B = 50)
+
+fviz_gap_stat(gap_stat)
+
+```
+
+# Principal Component Analysis
+
+PCA is relaxed stuff
+Throw in a little matrix and images. Credit quora.
+
+https://stats.stackexchange.com/questions/183236/what-is-the-relation-between-k-means-clustering-and-pca
+
+https://www.quora.com/What-is-the-relationship-between-K-means-and-PCA
+
+
+In our case, comp1 and comp2 explains
+```{r}
+pca <- princomp(data, cor = TRUE)
+# summary(pca, loadings = TRUE, scores = TRUE)
+pca$scores %>% as.data.frame() %>% select(Comp.1, Comp.2) %>% ggplot(aes(Comp.1, Comp.2)) +
+  geom_point() + theme_minimal() + 
+  geom_text(label=rownames(data), nudge_x = 0.25, nudge_y = 0.25, check_overlap = T)
+```
+Now k-means
+```{r}
+data$cluster <- kmeans(data_scaled, 3, nstart = 25)$cluster
+# yaxis <- rnorm(n = nrow(data), mean = 1, sd = 1)
+# data$yaxis <- yaxis
+
+# a <- data %>% 
+#   ggplot(aes(x = 1:nrow(data), fill = as.character(cluster))) + 
+#   theme_minimal() +
+#   geom_col(aes(y = cluster)) +
+#   geom_text(aes(y = cluster), label = rownames(data), check_overlap = T) +
+#   theme(legend.position = "none", axis.ticks.x = element_blank(), axis.text.x = element_blank(),
+#         axis.title = element_blank())
+# 
+# a %>% ggplotly()
+
+data %>% rownames_to_column("country") %>%
+  ggplot(aes(country, color = as.factor(cluster))) + 
+  coord_flip() + theme_minimal() + geom_text(aes(y = 1),label = rownames(data)) +
+  theme(legend.position = "none", axis.ticks = element_blank(), axis.text = element_blank(),
+        axis.title = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
+Now Cluster applied on top of it. 
+```{r}
+kmeans_model <- kmeans(data_scaled, 3, nstart = 25)
+
+# pca$scores %>% as.data.frame() %>% select(Comp.1, Comp.2) %>% 
+#   bind_cols(data %>% select(cluster)) %>% 
+#   ggplot(aes(Comp.1, Comp.2, col = as.factor(cluster))) +
+#   geom_point() + theme_minimal() + theme(legend.position = "none") + 
+#   xlab("Principal Component 1") + ylab("Principal Component 2") +
+#   geom_text(label = rownames(data), nudge_x = 0.25, nudge_y = 0.25, check_overlap = T)
+```
+
+Goes to show that PCA is one step on top of k-means
+```{r}
+
+pca <- princomp(data, cor = TRUE)
+data
+summary(pca, loadings = TRUE, scores = TRUE)
+pca$scores
+pca_kmeans_model <- pca$scores %>% as.data.frame() %>% select(Comp.1, Comp.2) %>% 
+  kmeans(centers = 7, nstart = 25)
+
+fviz_cluster(pca_kmeans_model, data = data) + theme_minimal() + ggtitle("My title")
+
+
+kmeans_model <- kmeans(data_scaled, 7, nstart = 25)
+fviz_cluster(kmeans_model, data = data_scaled) + theme_minimal() + ggtitle("My title")
+
+```
+
+
+For HOMEWORK
+
+
+```{r fig.height=9, fig.width=6, warning=FALSE, message=FALSE}
+# ```{R}
+kmeans_model <- kmeans(data_scaled, 5, nstart = 25)
+fviz_cluster(kmeans_model, data = data_scaled) + theme_minimal() + ggtitle("My title")
+
+data$cluster <- kmeans_model$cluster
+
+
+
+
+histo_viz <- list()
+for (i in colnames(data_scaled)) {
+  
+  mean_variable <- paste0('mean(', i, ')')
+  
+  histo_viz[[i]] <- data %>% group_by(cluster) %>%
+    summarize_(.dots = setNames(mean_variable, "mean")) %>%
+    ggplot(aes(cluster, mean)) + geom_col() + coord_flip() +
+    ylab(paste("Average", i)) + xlab("Cluster")
+  
+}
+
+grid.arrange(grobs = histo_viz, nrow = 3, ncol = 3, 
+             top = "Histograms to visualize data ranges" )
+
+
+```
+
