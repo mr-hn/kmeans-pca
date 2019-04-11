@@ -2,4 +2,4 @@
 
 K-Means Clustering - A Sparse Version of Principal Component Analysis  
 
-View the project [here!](http://mr-hn.github.io/classificationTech)
+View the project [here!](https://mr-hn.github.io/kmeans-pca/)
