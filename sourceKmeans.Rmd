@@ -374,7 +374,7 @@ in matrix terms as
 <br><center>$$minimize\ ||CW - X||^2 $$</center><br>
 
 * C denotes a matrix of mean values of all variables in different clusters. The dimension
- is `J` by `K` where J is the number of variables in the dataset and K is the number 
+is `J` by `K` where J is the number of variables in the dataset and K is the number 
 of clusters. Thus each column of matrix C represents a cluster.
 * W is the assignment matrix of dimension `K` rows and `I` columns where I is
 the number of records in the dataset.  
