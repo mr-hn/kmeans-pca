@@ -436,7 +436,5 @@ minimization problem helps to frame our understanding of other popular models
 such as K-Means and Linear Regression. Just goes to prove the importance of underlying
 concepts in data science.
 
-<u><a href="https://www.linkedin.com/in/harish-morekonda/"target="_blank">LinkedIn</a></u>
-
 Here's a link to the repository - <u><a href="https://github.com/mr-hn/kmeansPca"target="_blank">
 GitHub</a></u>
