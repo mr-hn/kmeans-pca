@@ -190,6 +190,7 @@ data_kmeans$cluster <- 0
 geo_data <- NULL
 
 for (i in 2:7) {
+  set.seed(1804)
   kmeans_model <- kmeans(data_scaled, i, nstart = 25)
   data_kmeans$cluster <- kmeans_model$cluster
   data_kmeans$k <- i
@@ -309,6 +310,7 @@ western and eastern Europe, leaving out Turkey and Yugoslavia into the third clu
 This seems <i>fair,</i> and the rest of the document will work with three clusters.
 
 ```{r}
+set.seed(1804)
 data$cluster <- kmeans(data_scaled, 3, nstart = 25)$cluster %>% as.numeric()
 
 data %>% rownames_to_column("country") %>% 
