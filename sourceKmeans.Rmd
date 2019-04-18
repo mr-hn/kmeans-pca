@@ -50,7 +50,7 @@ options(DT.options = list(paging = FALSE, # disable pagination
 K-Means algorithm is one of the popular clustering analysis techniques, that helps
 group similar data points into clusters and look for hidden insights. For example,
 by analyzing sales data, customers can be grouped into segments to help
-understand their behaviour. In one of the <u><a href="https://some.link"target="_blank">earlier posts</a></u>, 
+understand their behaviour. In one of the <u><a href="https://mr-hn.github.io/pcaIndex/"target="_blank">earlier posts</a></u>, 
 we explored Principal Component Analysis, a dimension reduction tool that transforms 
 a number of (possibly) correlated columns into a (smaller) number of uncorrelated 
 columns called principal components.
